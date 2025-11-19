@@ -3,34 +3,37 @@ from typing import Any, Dict, List
 
 import requests
 
-
 class MushroomClient:
     def __init__(self, base_url: str = "http://127.0.0.1:8008"):
         self.base_url = base_url
 
-    def predict(self, features: Dict[str, Any]) -> Dict[str, Any]:
+    def predict(
+        self, 
+        features: Dict[str, Any], 
+        return_probabilities: bool = True
+    ) -> Dict[str, Any]:
         """Предсказание для одного гриба"""
-        response = requests.get(f"{self.base_url}/predict", params=features)
+        params = features.copy()
+        params["return_probabilities"] = return_probabilities
+        response = requests.get(f"{self.base_url}/predict", params=params)
         response.raise_for_status()
         return response.json()
 
-    def predict_proba(self, features: Dict[str, Any]) -> Dict[str, Any]:
-        """Вероятности для одного гриба"""
-        response = requests.get(f"{self.base_url}/predict_proba", params=features)
-        response.raise_for_status()
-        return response.json()
-
-    def predict_batch(self, mushrooms: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def predict_batch(
+        self, 
+        mushrooms: List[Dict[str, Any]], 
+        return_probabilities: bool = True
+    ) -> Dict[str, Any]:
         """Пакетное предсказание"""
+        params = {"return_probabilities": return_probabilities}
         data = {"mushrooms": mushrooms}
-        response = requests.post(f"{self.base_url}/predict_batch", json=data)
+        response = requests.post(f"{self.base_url}/predict_batch", params=params, json=data)
         response.raise_for_status()
         return response.json()
 
-    def predict_proba_batch(self, mushrooms: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Пакетные вероятности"""
-        data = {"mushrooms": mushrooms}
-        response = requests.post(f"{self.base_url}/predict_proba_batch", json=data)
+    def get_categories(self) -> Dict[str, Any]:
+        """Получить допустимые значения категориальных признаков"""
+        response = requests.get(f"{self.base_url}/categories")
         response.raise_for_status()
         return response.json()
 
@@ -49,6 +52,7 @@ class MushroomClient:
         response = requests.post(f"{self.base_url}/fit", json=fit_data)
         response.raise_for_status()
         return response.json()
+
 
 def main():
     """Пример использования клиента"""
@@ -82,25 +86,37 @@ def main():
         status = client.get_status()
         print(json.dumps(status, indent=2, default=str))
 
-        print("\n2. Предсказание для одного гриба:")
-        prediction = client.predict(test_mushroom)
+        print("\n2. Допустимые категории:")
+        categories = client.get_categories()
+        print(json.dumps(categories, indent=2))
+
+        print("\n3. Предсказание для одного гриба (с вероятностями):")
+        prediction = client.predict(test_mushroom, return_probabilities=True)
         print(json.dumps(prediction, indent=2))
 
-        print("\n3. Вероятности для одного гриба:")
-        proba = client.predict_proba(test_mushroom)
-        print(json.dumps(proba, indent=2))
+        print("\n4. Предсказание для одного гриба (только класс):")
+        prediction_class_only = client.predict(test_mushroom, return_probabilities=False)
+        print(json.dumps(prediction_class_only, indent=2))
 
-        print("\n4. Пакетное предсказание:")
-        batch_pred = client.predict_batch([test_mushroom, test_mushroom])
+        print("\n5. Пакетное предсказание:")
+        batch_pred = client.predict_batch([test_mushroom, test_mushroom], return_probabilities=True)
         print(json.dumps(batch_pred, indent=2))
 
-        print("\n5. Пакетные вероятности:")
-        batch_proba = client.predict_proba_batch([test_mushroom, test_mushroom])
-        print(json.dumps(batch_proba, indent=2))
+        print("\n6. Переобучение модели (пример):")
+        training_data = [
+            {**test_mushroom, "target": 0},
+            {**test_mushroom, "target": 1}
+        ]
+        try:
+            fit_result = client.fit_model(training_data, "target")
+            print(json.dumps(fit_result, indent=2))
+        except Exception as e:
+            print(f"Переобучение не удалось (нормально для теста): {e}")
 
     except requests.exceptions.RequestException as e:
         print(f"Ошибка подключения: {e}")
         print("Убедитесь, что сервер запущен на http://127.0.0.1:8008")
+
 
 if __name__ == "__main__":
     main()

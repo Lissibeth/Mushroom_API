@@ -27,15 +27,6 @@ class TestMainEndpoints:
             data = response.json()
             assert "detail" in data
 
-    def test_predict_proba_endpoint_success(self, client, sample_mushroom_params):
-        response = client.get("/predict_proba", params=sample_mushroom_params)
-        if response.status_code == 200:
-            prediction_data = PredictionResponse(**response.json())
-            probs = prediction_data.probabilities
-            total = probs["edible"] + probs["poisonous"]
-            assert abs(total - 1.0) < 0.001
-        else:
-            assert response.status_code == 500
 
     def test_predict_batch_endpoint_success(self, client, sample_batch_data):
         response = client.post("/predict_batch", json=sample_batch_data)
@@ -45,13 +36,6 @@ class TestMainEndpoints:
         else:
             assert response.status_code == 500
 
-    def test_predict_proba_batch_endpoint_success(self, client, sample_batch_data):
-        response = client.post("/predict_proba_batch", json=sample_batch_data)
-        if response.status_code == 200:
-            batch_response = BatchPredictionResponse(**response.json())
-            assert len(batch_response.predictions) == 1
-        else:
-            assert response.status_code == 500
 
     def test_predict_missing_parameters(self, client):
         response = client.get("/predict", params={"cap_diameter": 5.0})

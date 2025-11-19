@@ -13,6 +13,7 @@ from sklearn.preprocessing import LabelEncoder, StandardScaler
 warnings.filterwarnings('ignore')
 
 def prepare_data():
+    """Подготавливает данные для обучения модели."""
     df = pd.read_csv("data/train.csv")
 
     df = df.drop(['id'], axis=1, errors='ignore')
@@ -39,6 +40,8 @@ def prepare_data():
     categorical_features = [col for col in features if col not in numeric_features]
 
     for col in categorical_features:
+        valid_mask = X[col].astype(str).str.match(r'^[a-zA-Z]$')
+        X.loc[~valid_mask, col] = 'unknown'
         X[col] = X[col].astype(str)
         X[col] = X[col].replace('nan', np.nan)
 
@@ -72,14 +75,19 @@ def prepare_data():
 
     print(f"Пропуски после обработки: {X.isnull().sum().sum()}")
 
-    return X, y, features, numeric_features, categorical_features
+    return X, y, features, numeric_features, categorical_features, numeric_imputer
 
 def train_and_save_model():
+    """Обучает и сохраняет модель классификации грибов."""
     print("Подготовка данных...")
-    X, y, features, numeric_features, categorical_features = prepare_data()
+    X, y, features, numeric_features, categorical_features, numeric_imputer = prepare_data()
 
     label_encoders = {}
     X_processed = X.copy()
+
+    preprocessors = {
+        'numeric_imputer': numeric_imputer
+    }
 
     for col in categorical_features:
         le = LabelEncoder()
@@ -89,6 +97,7 @@ def train_and_save_model():
     if numeric_features:
         scaler = StandardScaler()
         X_processed[numeric_features] = scaler.fit_transform(X_processed[numeric_features])
+        preprocessors['scaler'] = scaler
 
     print("Разделение на train/test...")
     X_train, X_test, y_train, y_test = train_test_split(
@@ -97,8 +106,7 @@ def train_and_save_model():
 
     print("Обучение модели...")
     model = RandomForestClassifier(
-        n_estimators=30,
-        max_depth=15,
+        n_estimators=100,
         random_state=42,
         n_jobs=-1
     )
@@ -112,6 +120,7 @@ def train_and_save_model():
     model_data = {
         'model': model,
         'label_encoders': label_encoders,
+        'preprocessors': preprocessors,
         'features': features,
         'numeric_features': numeric_features,
         'categorical_features': categorical_features,
